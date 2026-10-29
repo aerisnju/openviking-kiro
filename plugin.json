@@ -1,0 +1,20 @@
+{
+  "name": "openviking-kiro",
+  "version": "0.1.0",
+  "description": "Long-term semantic memory for the Kiro IDE agent — powered by OpenViking. Auto-recall relevant memories and capture the conversation as it happens.",
+  "author": {
+    "name": "aerisnju",
+    "url": "https://github.com/aerisnju"
+  },
+  "repository": "https://github.com/aerisnju/openviking-kiro",
+  "homepage": "https://github.com/aerisnju/openviking-kiro#readme",
+  "license": "AGPL-3.0",
+  "keywords": [
+    "memory",
+    "openviking",
+    "kiro",
+    "semantic-search",
+    "long-term-memory",
+    "context-engine"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "openviking": {
+      "command": "__NODE_BIN__",
+      "args": [
+        "__OPENVIKING_PLUGIN_ROOT__/servers/mcp-proxy.mjs"
+      ],
+      "env": {
+        "OPENVIKING_HOOK_SOURCE": "kiro"
+      },
+      "disabled": false
+    }
+  }
+}

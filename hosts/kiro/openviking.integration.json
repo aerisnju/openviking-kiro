@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "openviking-memory",
+  "version": "0.1.0",
+  "clients": [
+    "kiro"
+  ],
+  "capabilities": [
+    "hooks",
+    "mcp"
+  ]
+}

@@ -1,0 +1,13 @@
+node_modules/
+.universal-local-memory/
+.agents/
+.kiro/
+*.log
+*.bak
+.env
+.env.*
+*.pem
+*.key
+ovcli.conf*
+.DS_Store
+Thumbs.db

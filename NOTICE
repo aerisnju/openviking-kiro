@@ -1,0 +1,39 @@
+openviking-kiro
+Copyright (c) 2026 aerisnju
+
+This project is licensed under the GNU Affero General Public License,
+Version 3 (AGPL-3.0). See the LICENSE file.
+
+Upstream attribution
+--------------------
+openviking-kiro is derived from, and built on, the agent-hook-plugin
+framework of OpenViking:
+
+  Project:  OpenViking
+  Source:   https://github.com/volcengine/OpenViking
+  Path:     examples/agent-hook-plugin/
+  License:  GNU Affero General Public License v3.0 (AGPL-3.0)
+
+What comes from upstream:
+
+- scripts/hook.mjs, scripts/uri-guard.mjs and hosts/index.mjs are adapted from
+  the files of the same name in examples/agent-hook-plugin/ (modified to
+  register the Kiro host).
+- servers/mcp-proxy.mjs has the same content as the upstream file of the same
+  name.
+- hosts/kiro.mjs follows the structure of the upstream ZCode host
+  (examples/agent-hook-plugin/hosts/zcode.mjs).
+- hosts/incremental-turn-capture.mjs is a verbatim, unmodified copy of
+  examples/agent-hook-plugin/hosts/incremental-turn-capture.mjs from upstream
+  commit 03391bae4335eacf440a62d942f3951de6a63cbe (2026-09-23). Upstream has
+  changed that file since; this copy has not been updated to follow it.
+- At run time this package imports the OpenViking shared runtime
+  (memory-plugin-shared/lib) from the user's own OpenViking installation under
+  ~/.openviking/agent-integrations/. That runtime is not included in this
+  repository.
+
+The Kiro-specific parts (hosts/kiro*.mjs, the installer and uninstaller, the
+Kiro assets, and the tests) were written for this project.
+
+This is an unofficial community project. It is not affiliated with or
+endorsed by Volcengine or the OpenViking maintainers.
