@@ -49,12 +49,18 @@ temp `--prefix` dir.
   `lastTurnId` / `capturedTurnIds` / `capturedSinceCommit`, is a no-op on a
   repeat Stop, sends only a new turn, sends a user-before-assistant Stop exactly
   once, handles failed sends/commits and an unresolved session. Includes the
-  regression guard for the `{status, turns}` contract.
+  regression guard for the `{status, turns}` contract. Also: injected records
+  never reach the POST body, assistant-only turns are captured once, step
+  sessions read/send/commit nothing (and a human session beside one still
+  captures), and an unreadable or missing `session.json` is retried on the
+  next Stop and captured exactly once.
 - `kiro-capture-e2e.test.mjs` — **the real Stop hook**: runs the real installer
   into a temp prefix, then `node <bundle>/scripts/hook.mjs stop kiro` as a
   subprocess with an isolated environment and a stub OpenViking server on
   loopback; asserts the messages and commit requests, the written hook state,
-  the User-Agent version, and that the debug log has no `uncaught` error. Not
+  the User-Agent version, and that the debug log has no `uncaught` error; also
+  a session with injected records (only human text is POSTed, drop counts are
+  logged) and a step session (no request at all, skip logged once). Not
   covered: Kiro itself, the real OpenViking server, shell quoting of the hook
   command.
 - `kiro-adapter-contract.test.mjs` — the adapter object against the fields
@@ -68,7 +74,17 @@ temp `--prefix` dir.
 - `check-test-prereqs.test.mjs` — the `pretest` check and the npm scripts.
 - `kiro-turns.test.mjs` — the `messages.jsonl` allow-list parser (turn
   ordering, `Say`-only, incremental cursor, duplicate-Stop, trailing-user
-  pending, Stop-before/after-assistant single capture, sub-agent negative).
+  pending, Stop-before/after-assistant single capture, sub-agent negative),
+  plus mixed sessions with synthetic injected records (only human text is
+  sent, nothing is glued onto the next prompt, huge events, old-build records,
+  assistant-only turns).
+- `kiro-user-records.test.mjs` — `classifyKiroUserRecord()` per record shape:
+  human shapes of every Kiro era kept (multi-line, long pasted, non-ASCII,
+  documents/images), steer with `notification` / `steeringClearedIds` / empty
+  text, synthetic messages, text envelopes, oversized structured text, and the
+  deliberately narrow cases that are kept (steer without notification meta).
+- `kiro-session-kind.test.mjs` — step vs human vs unknown from `session.json`
+  (each of the three marker keys, non-markers, missing/invalid/unreadable file).
 - `kiro-session.test.mjs` — the session locator (glob primary, index secondary,
   `sess_`-prefix tolerance both ways and both paths, present-but-unmatched
   once-per-session log, missing, mtime tertiary).

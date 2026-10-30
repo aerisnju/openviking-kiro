@@ -93,6 +93,8 @@ the client id (`kiro`).
 - `hosts/kiro.mjs` — the adapter (mirrors the ZCode host).
 - `hosts/kiro-turns.mjs` — parses `messages.jsonl` into ordered turns.
 - `hosts/kiro-session.mjs` — locates the session's `messages.jsonl`.
+- `hosts/kiro-user-records.mjs` — tells human `user` records from Kiro-injected ones.
+- `hosts/kiro-session-kind.mjs` — tells human sessions from workflow step sessions.
 - `hosts/kiro-guard.mjs` — the ask-not-deny PreToolUse envelope helper.
 - `hosts/kiro-capture.mjs` — thin wrapper over the incremental capture model.
 - `scripts/hook.mjs`, `scripts/request-budget.mjs`, `servers/mcp-proxy.mjs` and
@@ -232,11 +234,36 @@ changed without the lock being updated.
   official doctor, because `kiro` is not in upstream's `HARNESS_KEYS`. It has
   no functional effect on the hooks; per-harness defaults fall back to the
   global default.
-- **What is captured:** user prompts and the assistant's visible text
-  (`Say` records) only. Tool calls and results, reasoning, and sub-agent
-  records are not captured.
+- **What is captured:** user prompts typed by the human and the assistant's
+  visible text (`Say` records) only. Tool calls and results, reasoning, and
+  sub-agent records are not captured. Records that Kiro injects as `user`
+  messages (workflow `steer` events, `_kiro/workflow/*` JSON-RPC,
+  `[WORKFLOW NOTIFICATION]` and `A workflow you launched (...)` messages) are
+  dropped, and an oversized (> 12,000 characters) JSON/tag-wrapped record is
+  dropped as a backstop. A record that matches none of these rules is kept, so
+  an unrecognised new shape may still be captured. The agent's reply to such an
+  injected message is captured.
+- **Workflow/sub-agent step sessions are not captured.** Each workflow step is
+  its own Kiro session, and only the human-facing session is written to
+  OpenViking. A session counts as a step session when its `session.json` has a
+  non-empty `rootConversationId`, or `_meta.kiro.workflow`, or
+  `_meta.kiro.serverSession`. Recall (session start, prompt submit) still runs
+  in step sessions; only capture is suppressed. If `session.json` is missing or
+  unreadable, that Stop skips capture without moving the cursor and the next Stop
+  retries; a session whose `session.json` is valid but has none of the markers is
+  treated as human and captured. The marker keys are specific to Kiro builds with
+  workflow support; a build that renames them would be captured as human.
+- **Seeing what was dropped or skipped:** set `OPENVIKING_DEBUG=1` (and
+  optionally `OPENVIKING_DEBUG_LOG=<file>`) in the environment Kiro runs the
+  hooks with. The Stop hook then writes one JSON line per event:
+  `capture_user_records_dropped` (kept and dropped counts per reason),
+  `capture_skipped_step_session` and `capture_deferred_session_kind_unknown`
+  (reason and session id). Message content is never logged.
+- **Earlier data is not cleaned up.** Messages and step sessions captured by
+  0.1.1 stay in OpenViking until you delete them.
 - **Stop runs inline** under a 25 s request budget (the hook timeout is 30 s).
   A write that does not finish is queued and replayed at the next session start.
 - **Verified only on the author's Kiro build.** Kiro's hook and session
   formats may differ in other builds. Release 0.1.0 captured nothing because of
-  a bug fixed in 0.1.1 (see [CHANGELOG.md](./CHANGELOG.md)).
+  a bug fixed in 0.1.1, and 0.1.1 captured Kiro-injected messages and workflow
+  step sessions, fixed in 0.1.2 (see [CHANGELOG.md](./CHANGELOG.md)).

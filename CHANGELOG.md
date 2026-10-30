@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.2
+
+**Fixes capture of Kiro-injected messages as if the user had said them, and stops
+capturing workflow/sub-agent step sessions.**
+
+- Kiro writes more than human prompts as `user` records in `messages.jsonl`:
+  workflow events (`source: "steer"`, `_kiro/workflow/*` JSON-RPC, step reports,
+  some over 80,000 characters) and synthetic messages (`[WORKFLOW NOTIFICATION]`,
+  `A workflow you launched (...)`). 0.1.1 sent all of them to OpenViking as user
+  speech and glued them onto the next real prompt. The parser now drops them
+  before they can become user text (`hosts/kiro-user-records.mjs`; rules in
+  [DESIGN.md](./DESIGN.md) section 6). Genuine prompts are kept, including
+  multi-line, long pasted, non-ASCII and older-build records without `source` or
+  `_meta`.
+- A turn whose user part was entirely injected still has the agent's reply
+  (for example its answer after a workflow finished); that reply is captured.
+- Each workflow/sub-agent step runs as its own Kiro session, and 0.1.1 created
+  one cloud session per step. Step sessions are no longer captured: the Stop
+  hook skips a session whose `session.json` marks it as a step. Session start
+  and prompt recall are unchanged for those sessions.
+- If `session.json` is missing or unreadable at Stop time, that Stop is skipped
+  without advancing the cursor, and the next Stop retries.
+- With debug logging on, the Stop hook logs drop counts per reason
+  (`capture_user_records_dropped`) and skipped sessions
+  (`capture_skipped_step_session`, `capture_deferred_session_kind_unknown`).
+  Counts, reasons and session ids only, never message content.
+- **Data already written by 0.1.1 is not cleaned up automatically.** Injected
+  messages and step sessions captured earlier stay in OpenViking until you delete
+  them yourself.
+
 ## 0.1.1
 
 **Fixes a bug that made the Stop hook capture nothing in 0.1.0.**

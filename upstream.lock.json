@@ -93,7 +93,7 @@
       "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
       "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
       "upstreamBlob": "ba769adf18829a79f90b163f917688048433d2f2",
-      "localSha256": "24d7d58d622cbe8c3268eb25c91da22a905aaac9543d3790aac856662dfd8ea0",
+      "localSha256": "22bcca6f51f0ef82530b3030b6951d016e289071c81d8c67b163c607184d2358",
       "note": "own name, description, author, license and version"
     },
     {
@@ -104,7 +104,7 @@
       "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
       "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
       "upstreamBlob": "76f972b4133b93a75a3c91cb5de9ff0ddbe09279",
-      "localSha256": "846324cd42864bd6b8287ff7511b298e55af85d8b41f74e98732749b9049d458",
+      "localSha256": "dc7ff9982bd94a701a186bc319b27b3bf797e5f161ae3d2f366be77fe6c2a7ee",
       "note": "same schema; client kiro; own version"
     },
     {
