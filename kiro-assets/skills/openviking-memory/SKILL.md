@@ -10,7 +10,7 @@ description: >
   folder, or shared between repositories. Covers choosing between context
   search, find, list, search, and grep, reading viking:// URIs, and when (not)
   to write.
-version: 0.1.0
+version: 2026.10.1
 ---
 
 # OpenViking Memory (Kiro)
@@ -26,7 +26,8 @@ under a harness prefix such as `mcp__openviking__find`; they are the same tools.
    context (look for an `<openviking-context>` block). Check it before
    searching: if it answers the question, use it and skip the tool call.
 2. **During the task** — when injected context is not enough, retrieve (below).
-   Expand promising hits with `read` before relying on them.
+   Expand promising hits with `read` before relying on them; an abstract can be
+   staler or thinner than its source.
 3. **Data in** — when durable information appears, write it (below), but be
    deliberate: retrieval quality degrades as the store fills with noise.
 4. **End** — the Stop hook captures and commits the conversation automatically,
@@ -54,6 +55,9 @@ OpenViking MCP tools instead.
   durable facts, preferences, and decisions. Do not mirror routine conversation.
 - `add_resource` — imports files, directories, URLs, or Git repos as durable
   knowledge; processing is asynchronous.
+- `write` / `edit` — only for files you author at a known URI. Never use them to
+  store a file, URL, or skill the user hands you: that skips parsing and
+  installation.
 - `forget` — permanently deletes. Confirm with the user and pass the exact URI.
 
 ## Where memories are filed
@@ -62,13 +66,17 @@ A git repository derives its peer from its `origin`, so every clone, worktree
 and subdirectory of one repository shares one memory. A directory that is
 neither a repository nor marked goes to the user-level space.
 
-To give a directory its own memory, create `.openviking/config.json` in it:
+Upstream documents `.openviking/config.json` (below) for Claude Code and Codex
+only; other harnesses, including this Kiro integration, are not documented to
+read it, and pin a peer with the `OPENVIKING_PEER_ID` environment variable
+instead. Do not invent other keys or commands for this: no `ov` subcommand
+creates, renames or merges a peer.
 
 ```json
 {"version": 1, "peer": {"id": "my-project"}}
 ```
 
-Two directories with the same `peer.id` share one memory. Adding
+Two directories carrying the same `peer.id` share one memory. Adding
 `"recall": {"peer_scope": "actor"}` limits recall to this project.
 
 ## Boundaries
@@ -82,5 +90,6 @@ Two directories with the same `peer.id` share one memory. Adding
 ## Beyond the MCP tools
 
 More advanced OpenViking operations are available through the `ov` CLI — normal
-agent work rarely needs it. The documentation index is at
-<https://docs.openviking.ai/llms.txt>.
+agent work rarely needs it. If it is not installed, see
+<https://docs.openviking.ai/en/getting-started/05-cli-setup/llms.txt>. The full
+documentation index is at <https://docs.openviking.ai/llms.txt>.
