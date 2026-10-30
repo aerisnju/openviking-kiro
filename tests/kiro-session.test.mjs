@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { makeTmp } from "./helpers/tmp.mjs";
 
 import { resolveKiroMessagesPath, kiroHome } from "../hosts/kiro-session.mjs";
 
 function tempHome() {
-  return mkdtempSync(join(tmpdir(), "ov-kiro-sess-"));
+  return makeTmp("sess");
 }
 
 function seedSession(home, shortId, sessDir) {

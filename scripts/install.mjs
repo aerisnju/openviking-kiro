@@ -18,12 +18,14 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   renameSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +102,15 @@ function renderHookFile(hook, bundle) {
   return JSON.stringify(obj, null, 2);
 }
 
+function bundleVersion() {
+  try {
+    const version = JSON.parse(readFileSync(join(REPO_ROOT, "plugin.json"), "utf8")).version;
+    return typeof version === "string" ? version : "";
+  } catch {
+    return "";
+  }
+}
+
 function mergeMcp(mcpPath, bundle, nodeBin) {
   let existing = {};
   if (existsSync(mcpPath)) {
@@ -121,10 +132,32 @@ function mergeMcp(mcpPath, bundle, nodeBin) {
   existing.mcpServers.openviking = {
     command: nodeBin,
     args: [join(bundle, "servers", "mcp-proxy.mjs")],
-    env: { OPENVIKING_HOOK_SOURCE: "kiro" },
+    env: {
+      OPENVIKING_HOOK_SOURCE: "kiro",
+      // Same naming upstream's installer gives its MCP entries; the shared
+      // runtime puts the version in its User-Agent (cosmetic).
+      OPENVIKING_INTEGRATION_ID: "openviking-memory",
+      ...(bundleVersion() ? { OPENVIKING_INTEGRATION_VERSION: bundleVersion() } : {}),
+    },
     disabled: false,
   };
   return existing;
+}
+
+// Maintainer tools that live in scripts/ but are not part of the runtime bundle.
+const DEV_ONLY_SCRIPTS = new Set(["check-upstream.mjs", "check-test-prereqs.mjs"]);
+const bundleFilter = (src) => !DEV_ONLY_SCRIPTS.has(basename(src));
+
+// Relative, forward-slash file list of a directory tree (for the dry-run plan).
+function listFiles(dir, base = "") {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!bundleFilter(entry.name)) continue;
+    const rel = base ? `${base}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...listFiles(join(dir, entry.name), rel));
+    else out.push(rel);
+  }
+  return out;
 }
 
 function writeAtomic(targetPath, content) {
@@ -166,11 +199,16 @@ function main() {
     ["README.md", join(REPO_ROOT, "README.md"), join(P.KIRO_BUNDLE, "README.md")],
   ];
   if (args.dryRun) {
-    for (const [name, , dst] of bundleItems) log(`[dry-run] copy ${name} -> ${dst}`);
+    for (const [name, src, dst] of bundleItems) {
+      log(`[dry-run] copy ${name} -> ${dst}`);
+      if (statSync(src).isDirectory()) {
+        for (const file of listFiles(src)) log(`[dry-run]   + ${name}/${file}`);
+      }
+    }
   } else {
     mkdirSync(P.KIRO_BUNDLE, { recursive: true });
     for (const [, src, dst] of bundleItems) {
-      cpSync(src, dst, { recursive: true });
+      cpSync(src, dst, { recursive: true, filter: bundleFilter });
     }
   }
 
@@ -192,7 +230,13 @@ function main() {
   const alreadyMatches =
     existsSync(P.MCP_PATH) && readFileSync(P.MCP_PATH, "utf8") === mergedText;
   if (args.dryRun) {
-    log(`[dry-run] merge MCP -> ${P.MCP_PATH}:\n${mergedText}`);
+    // Print only our entry and the names of the others: foreign servers' env
+    // blocks may hold credentials and must not be echoed.
+    const others = Object.keys(merged.mcpServers).filter((name) => name !== "openviking");
+    log(
+      `[dry-run] merge MCP -> ${P.MCP_PATH} (other servers kept untouched: ${others.length ? others.join(", ") : "none"})\n` +
+        `${JSON.stringify({ openviking: merged.mcpServers.openviking }, null, 2)}`,
+    );
   } else if (!alreadyMatches) {
     if (existsSync(P.MCP_PATH)) {
       writeFileSync(`${P.MCP_PATH}.bak`, readFileSync(P.MCP_PATH), { mode: 0o600 });

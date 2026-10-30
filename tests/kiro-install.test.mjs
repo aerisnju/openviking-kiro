@@ -3,14 +3,13 @@ import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { makeTmp } from "./helpers/tmp.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..");
@@ -18,7 +17,7 @@ const INSTALL = join(REPO, "scripts", "install.mjs");
 const UNINSTALL = join(REPO, "scripts", "uninstall.mjs");
 
 function freshPrefix() {
-  return mkdtempSync(join(tmpdir(), "ov-kiro-install-"));
+  return makeTmp("install");
 }
 
 function seedSharedLib(prefix) {
@@ -110,6 +109,11 @@ test("MCP merge preserves a pre-seeded server and adds openviking correctly", ()
   assert.ok(ov, "openviking added");
   assert.equal(ov.command, process.execPath);
   assert.equal(ov.env.OPENVIKING_HOOK_SOURCE, "kiro");
+  assert.equal(ov.env.OPENVIKING_INTEGRATION_ID, "openviking-memory");
+  assert.equal(
+    ov.env.OPENVIKING_INTEGRATION_VERSION,
+    JSON.parse(readFileSync(join(REPO, "plugin.json"), "utf8")).version,
+  );
   assert.equal(ov.disabled, false);
   const proxyAbs = join(prefix, ".openviking", "agent-integrations", "kiro", "servers", "mcp-proxy.mjs");
   assert.equal(ov.args[0], proxyAbs);
@@ -207,6 +211,32 @@ test("uninstall removes exactly our hooks + mcp entry, leaving foreign entries i
   assert.equal(existsSync(join(prefix, ".kiro", "steering", "openviking-memory.md")), false);
   assert.equal(existsSync(join(prefix, ".kiro", "skills", "openviking-memory")), false);
   assert.equal(existsSync(join(prefix, ".openviking", "agent-integrations", "kiro")), false);
+});
+
+test("--dry-run lists every bundled script (incl. request-budget.mjs) and writes nothing", () => {
+  const prefix = freshPrefix();
+  seedSharedLib(prefix);
+  mkdirSync(dirname(mcpPath(prefix)), { recursive: true });
+  writeFileSync(
+    mcpPath(prefix),
+    JSON.stringify({ mcpServers: { other: { command: "x", env: { TOKEN: "foreign-env-marker" } } } }),
+  );
+  const r = runInstall(prefix, ["--dry-run"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stdout, /foreign-env-marker/, "foreign MCP server env is never echoed");
+  assert.match(r.stdout, /other servers kept untouched: other/);
+  for (const file of ["hook.mjs", "request-budget.mjs", "uri-guard.mjs"]) {
+    assert.match(r.stdout, new RegExp(`\\+ scripts/${file.replace(".", "\\.")}`), file);
+  }
+  assert.doesNotMatch(r.stdout, /check-upstream|check-test-prereqs/);
+  assert.equal(existsSync(join(prefix, ".kiro", "hooks")), false, "dry run wrote no hook files");
+  assert.equal(existsSync(`${mcpPath(prefix)}.bak`), false, "dry run did not touch mcp.json");
+  assert.doesNotMatch(readFileSync(mcpPath(prefix), "utf8"), /openviking/, "mcp.json not merged");
+  assert.equal(
+    existsSync(join(prefix, ".openviking", "agent-integrations", "kiro")),
+    false,
+    "dry run copied no bundle",
+  );
 });
 
 test("uninstall is idempotent (nothing to remove → exit 0)", () => {

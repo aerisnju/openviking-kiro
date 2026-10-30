@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { makeTmp } from "./helpers/tmp.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..");
@@ -28,7 +29,7 @@ function stageBundle() {
   const shared = locateSharedUriGuard();
   if (!shared) return null;
 
-  const tmp = mkdtempSync(join(tmpdir(), "ov-kiro-uriguard-"));
+  const tmp = makeTmp("uriguard");
   cpSync(join(REPO, "scripts"), join(tmp, "kiro", "scripts"), { recursive: true });
   cpSync(join(REPO, "hosts"), join(tmp, "kiro", "hosts"), { recursive: true });
 

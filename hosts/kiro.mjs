@@ -10,6 +10,7 @@
  * tolerance.
  */
 
+import { readFileSync } from "node:fs";
 import {
   addAgentMessages,
   commitAgentSession,
@@ -17,6 +18,28 @@ import {
 import { kiroPreToolUseOutput } from "./kiro-guard.mjs";
 import { buildKiroTurns, cleanKiroText } from "./kiro-turns.mjs";
 import { applyKiroCaptureResult, buildKiroCapturePlan } from "./kiro-capture.mjs";
+
+/**
+ * Name this integration to the shared runtime, the way upstream's installer does
+ * with OPENVIKING_INTEGRATION_ID / _VERSION: the runtime puts the version in
+ * the User-Agent it sends (cosmetic). Kiro hook commands carry no env prefix
+ * (the shell is not known), so the adapter sets them when it is imported, which
+ * happens before hook.mjs loads its config. An operator-set value wins.
+ */
+export function ensureIntegrationEnv(env = process.env) {
+  if (!env.OPENVIKING_INTEGRATION_ID) env.OPENVIKING_INTEGRATION_ID = "openviking-memory";
+  if (!env.OPENVIKING_INTEGRATION_VERSION) {
+    try {
+      const manifest = new URL("../plugin.json", import.meta.url);
+      const version = JSON.parse(readFileSync(manifest, "utf8")).version;
+      if (typeof version === "string" && version) env.OPENVIKING_INTEGRATION_VERSION = version;
+    } catch {
+      // No manifest next to the bundle (e.g. a bare checkout of hosts/): the UA keeps 0.0.0.
+    }
+  }
+  return env;
+}
+ensureIntegrationEnv();
 
 export const kiro = {
   prefix: "ki-",
@@ -28,7 +51,11 @@ export const kiro = {
     "user-prompt-submit": "prompt",
     stop: "capture",
   },
-  requestBudgets: { stop: 25_000 }, // abort ~5s before Kiro's 30s Stop kill so state persists
+  // Shared per-hook request deadline (scripts/request-budget.mjs, ms). Each is
+  // below the hook timeout scripts/install.mjs renders (30 / 20 / 30 s) so the
+  // hook ends and persists state before Kiro would kill it. Same values as
+  // upstream's zcode adapter.
+  requestBudgets: { "session-start": 25_000, "user-prompt-submit": 17_000, stop: 25_000 },
   envelope(event, block) {
     // Capture (stop) returns no block, so hook.mjs's emit("") yields !block and
     // returns null here — only session-start / user-prompt-submit ever reach
@@ -60,8 +87,17 @@ export const kiro = {
     // Thread the visible logger + once-per-session flag into the locator so a
     // present-but-unmatched session is diagnosed loudly, exactly once.
     const parseState = { ...state, __log: ctx.log };
-    const turns = buildKiroTurns(ctx.input, parseState); // reads messages.jsonl
-    const plan = buildKiroCapturePlan(turns, state, ctx.cfg);
+    // buildKiroTurns() returns { status, turns } (same shape as Kimi's builder),
+    // NOT an array: the plan builder iterates its first argument, so the turns
+    // array must be unpacked here. (0.1.0 passed the whole object and threw
+    // "turns is not iterable" on every Stop.)
+    const transcript = buildKiroTurns(ctx.input, parseState); // reads messages.jsonl
+    if (transcript.status !== "ok") {
+      // "missing" (unresolved session / no transcript yet) or "unreadable":
+      // nothing to capture. Say so in the debug log, as Kimi does.
+      ctx.log(`capture_${transcript.status}`, transcript.error ? { error: transcript.error } : {});
+    }
+    const plan = buildKiroCapturePlan(transcript.turns, state, ctx.cfg);
     // Fail-closed: skip silently when there is nothing new. Persist the
     // loggedUnresolved flag the locator may have set so the warn fires once.
     if (plan.toSend.length === 0) {

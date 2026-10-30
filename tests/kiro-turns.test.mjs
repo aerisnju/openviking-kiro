@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { makeTmp } from "./helpers/tmp.mjs";
 
 import {
   buildKiroTurns,
@@ -81,7 +81,7 @@ test("cursor loss: lastTurnId absent from file restarts from head, ack set suppr
 });
 
 test("trailing user with no following execution → no turn (left pending)", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ov-kiro-turns-"));
+  const dir = makeTmp("turns");
   const path = join(dir, "messages.jsonl");
   writeLines(path, [
     { id: "u1", timestamp: "t", payload: { type: "user", content: "dangling question" } },
@@ -90,7 +90,7 @@ test("trailing user with no following execution → no turn (left pending)", () 
 });
 
 test("Stop-before-assistant then Stop-after-assistant → exactly ONE user capture under real executionId", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ov-kiro-turns-"));
+  const dir = makeTmp("turns");
   const path = join(dir, "messages.jsonl");
 
   // Stop 1: file ends on a pending user with no execution yet.
@@ -123,7 +123,7 @@ test("Stop-before-assistant then Stop-after-assistant → exactly ONE user captu
 });
 
 test("allow-list negative: sub_agent_* carrying an executionId creates no turn", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ov-kiro-turns-"));
+  const dir = makeTmp("turns");
   const path = join(dir, "messages.jsonl");
   writeLines(path, [
     { id: "s1", timestamp: "t1", payload: { type: "sub_agent_start", executionId: "exec-x" } },
@@ -133,7 +133,7 @@ test("allow-list negative: sub_agent_* carrying an executionId creates no turn",
 });
 
 test("a user record without _meta still parses and attaches by ordering", () => {
-  const dir = mkdtempSync(join(tmpdir(), "ov-kiro-turns-"));
+  const dir = makeTmp("turns");
   const path = join(dir, "messages.jsonl");
   writeLines(path, [
     { id: "u1", timestamp: "t1", payload: { type: "user", content: "no meta here" } },
@@ -154,7 +154,7 @@ test("a user record without _meta still parses and attaches by ordering", () => 
 
 test("buildKiroTurns returns no turns and fails closed when the session path is unresolved", () => {
   const prev = process.env.KIRO_HOME;
-  process.env.KIRO_HOME = mkdtempSync(join(tmpdir(), "ov-kiro-home-"));
+  process.env.KIRO_HOME = makeTmp("home");
   try {
     const out = buildKiroTurns({ session_id: "sess_missing" }, {});
     assert.deepEqual(out.turns, []);

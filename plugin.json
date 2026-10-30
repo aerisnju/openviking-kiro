@@ -1,6 +1,6 @@
 {
   "name": "openviking-kiro",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Long-term semantic memory for the Kiro IDE agent — powered by OpenViking. Auto-recall relevant memories and capture the conversation as it happens.",
   "author": {
     "name": "aerisnju",
