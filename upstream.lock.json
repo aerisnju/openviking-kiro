@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "description": "Provenance of files copied or mirrored from volcengine/OpenViking. Read by scripts/check-upstream.mjs. class A = verbatim copy (upstreamSha256 must equal localSha256), B = adapted copy, C = independent file mirroring an upstream pattern. For B and C, upstreamCommit / upstreamBlob / alsoWatch[].upstreamBlob record the upstream revision this file was last REVIEWED against (not a byte match). To add a file, add { path, class, upstreamPath } and run: node scripts/check-upstream.mjs --upstream <clone> --update-lock",
+  "upstream": {
+    "repo": "volcengine/OpenViking",
+    "commit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+    "commitDate": "2026-10-30T03:55:31-07:00",
+    "pluginVersion": "0.5.29"
+  },
+  "files": [
+    {
+      "path": "scripts/hook.mjs",
+      "class": "A",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/scripts/hook.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "1e69ab34c8a643a35bef417260a418c022d17c9d",
+      "upstreamSha256": "737c89b01be6534127b797b3d67b1be8704edf78342db62163262b18242de678",
+      "localSha256": "737c89b01be6534127b797b3d67b1be8704edf78342db62163262b18242de678"
+    },
+    {
+      "path": "scripts/request-budget.mjs",
+      "class": "A",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/scripts/request-budget.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "9455fed92e9c5bf23f7e59233d52bfa529426e23",
+      "upstreamSha256": "e63b832c9b31ebfb2875d99cd55b4676bda1c3620f85621ba280db9cd0e1886c",
+      "localSha256": "e63b832c9b31ebfb2875d99cd55b4676bda1c3620f85621ba280db9cd0e1886c"
+    },
+    {
+      "path": "servers/mcp-proxy.mjs",
+      "class": "A",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/servers/mcp-proxy.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "19a4fc8d6faa56d9addb0b68cd386238abe2bb92",
+      "upstreamSha256": "fe7c9e833887e28d909c7a32d8bdb463d092acc6c44963073e58fe44f0339b5a",
+      "localSha256": "fe7c9e833887e28d909c7a32d8bdb463d092acc6c44963073e58fe44f0339b5a"
+    },
+    {
+      "path": "hosts/incremental-turn-capture.mjs",
+      "class": "A",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/incremental-turn-capture.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "3d75091a5f0e4aab103e2eb2f71e8b1383a1a796",
+      "upstreamSha256": "7b590aa9f8e819f3963d7884f2205322116921e12af1e2614b9e1b0ee3ed8cbf",
+      "localSha256": "7b590aa9f8e819f3963d7884f2205322116921e12af1e2614b9e1b0ee3ed8cbf"
+    },
+    {
+      "path": "scripts/uri-guard.mjs",
+      "class": "B",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/scripts/uri-guard.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "774cb4009420a683b984063dfdf8758a31b1383f",
+      "localSha256": "d93b5e0fc00ae7a85dac24a53fcfefcc754a068839b486a027c3425fe3445771",
+      "note": "client id read from argv[3] (hook command is `uri-guard.mjs pre-tool-use kiro`), defaults to kiro"
+    },
+    {
+      "path": "hosts/index.mjs",
+      "class": "B",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/index.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "e9de0cf9f2bad1de1c975eaa17925fc448dac0e2",
+      "localSha256": "8092f24652d8ceca239cffb85c1e282f3387b911847843242ed9381267b1e07c",
+      "note": "HOSTS = { kiro } instead of the six upstream hosts"
+    },
+    {
+      "path": "hosts/kiro-capture.mjs",
+      "class": "B",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/zcode-capture.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "26bf912fa4c55ba083097809bf91bbf5f22ca045",
+      "localSha256": "57d3da2f7d94ffd74d5f21882a940027478536c17c163a9066847c46da26c48e",
+      "note": "zcode-capture.mjs with Zcode renamed to Kiro"
+    },
+    {
+      "path": "plugin.json",
+      "class": "B",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/plugin.json",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "ba769adf18829a79f90b163f917688048433d2f2",
+      "localSha256": "24d7d58d622cbe8c3268eb25c91da22a905aaac9543d3790aac856662dfd8ea0",
+      "note": "own name, description, author, license and version"
+    },
+    {
+      "path": "hosts/kiro/openviking.integration.json",
+      "class": "B",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/zcode/openviking.integration.json",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "76f972b4133b93a75a3c91cb5de9ff0ddbe09279",
+      "localSha256": "846324cd42864bd6b8287ff7511b298e55af85d8b41f74e98732749b9049d458",
+      "note": "same schema; client kiro; own version"
+    },
+    {
+      "path": "kiro-assets/skills/openviking-memory/SKILL.md",
+      "class": "B",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/skills/openviking-memory/SKILL.md",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "253a32e508c83618af7515d8b94254707e57f300",
+      "localSha256": "ea5f99f78109b7f910ddd0728815c3837295d6397c64eac0e9026389e1e231c8",
+      "note": "Kiro wording, Kiro tool names, no cross-references to skills this project does not ship"
+    },
+    {
+      "path": "hosts/kiro.mjs",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/zcode.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "9121711feb77416c17369330363f8a879859f05c",
+      "localSha256": "be54bd3a01ae35b234c988d82790856590ed21bcdb34b9feb4e238e0dec59c01",
+      "alsoWatch": [
+        {
+          "upstreamPath": "examples/agent-hook-plugin/hosts/kimicode.mjs",
+          "upstreamBlob": "1ce6bbbb297645ca2283cf72bb1ceba02063ccc6"
+        }
+      ],
+      "note": "adapter object; capture flow follows zcode, {status, turns} handling follows kimicode"
+    },
+    {
+      "path": "hosts/kiro-turns.mjs",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/kimicode-turns.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "dc43d6f5350d1c457b820b746b47a33827bfe299",
+      "localSha256": "6b09f102dec690d67477b9584b259f771170af7ca8dc19b10f5e4803acc4714f",
+      "alsoWatch": [
+        {
+          "upstreamPath": "examples/agent-hook-plugin/hosts/zcode-turns.mjs",
+          "upstreamBlob": "ab257d0100edb92505e5679ecb4a712965cbbc37"
+        }
+      ],
+      "note": "messages.jsonl parser; same {status, turns} shape and pending-user idea as Kimi"
+    },
+    {
+      "path": "hosts/kiro-guard.mjs",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/memory-plugin-shared/lib/uri-guard.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "d09fdc208998ea7611c44a393175505904b02312",
+      "localSha256": "364f1ebce632d304b3fbf78b9105ab49aaf1a1b08ee94c42b8874be6c6185fae",
+      "note": "ask-not-deny PreToolUse envelope around evaluateUriGuard / readToolEvent"
+    },
+    {
+      "path": "hosts/kiro-session.mjs",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/kimicode-turns.mjs",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "dc43d6f5350d1c457b820b746b47a33827bfe299",
+      "localSha256": "a99e860d24e201e78122e8e6d6d1ac92eb087dd64ae7fbb32a45c921220a9522",
+      "note": "finds the session transcript from Kiro's own layout; same idea as resolveKimicodeWirePath"
+    },
+    {
+      "path": "hosts/kiro/.mcp.json",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/zcode/.mcp.json",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "755d8c0e67528adc56c5cd6fc161fc335ed17395",
+      "localSha256": "066455011359ad1728c7e580e01eda6df18edc48e7bc4e4f007f6e06b014045e",
+      "note": "reference template only; the installer builds the entry in code"
+    },
+    {
+      "path": "scripts/install.mjs",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/memory-plugin-shared/install.sh",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "e4fcc558b36961d5b11f1cf2f435f9f9bda47cb3",
+      "localSha256": "d2a6380a0bb5e4e30f4469c4c0e11f76c13eeac229ba8165282935872fb3c8f8",
+      "alsoWatch": [
+        {
+          "upstreamPath": "examples/memory-plugin-shared/lib/install/host-json-config.mjs",
+          "upstreamBlob": "5e5e56c9bcab498c490e3ee1aea1cffe17075465"
+        }
+      ],
+      "note": "Node installer mirroring bundle copy, preflight, atomic merge with .bak, integration env"
+    },
+    {
+      "path": "scripts/uninstall.mjs",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/memory-plugin-shared/install.sh",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "e4fcc558b36961d5b11f1cf2f435f9f9bda47cb3",
+      "localSha256": "e7126e268e1d1e231b3f942bdc469747384c70359a0dbc88f3d21601a66bbe5f",
+      "alsoWatch": [
+        {
+          "upstreamPath": "examples/memory-plugin-shared/lib/install/host-json-config.mjs",
+          "upstreamBlob": "5e5e56c9bcab498c490e3ee1aea1cffe17075465"
+        }
+      ],
+      "note": "removes only what this installer wrote"
+    },
+    {
+      "path": "kiro-assets/steering/openviking-memory.md",
+      "class": "C",
+      "upstreamRepo": "volcengine/OpenViking",
+      "upstreamPath": "examples/agent-hook-plugin/hosts/cursor/rules/openviking-memory.mdc",
+      "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
+      "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
+      "upstreamBlob": "6ecf7fb7ea1c0dc8de6c81c1c0419c1091eca5a0",
+      "localSha256": "590de793f77441ff3cf475cbf80aef323bebaff5cdd4ab01a0ea43793e603f42",
+      "note": "always-on rule; text is original"
+    }
+  ],
+  "sharedLibImports": {
+    "agent-hook-runtime.mjs": [
+      "addAgentMessages",
+      "buildAgentProfile",
+      "commitAgentSession",
+      "createAgentLogger",
+      "deriveAgentSessionId",
+      "loadAgentHookConfig",
+      "makeAgentFetchJSON",
+      "readHookState",
+      "recallForPrompt",
+      "replayAgentPending",
+      "resolveNativeSessionId",
+      "runHookStage",
+      "stableHash",
+      "withAgentHookLock",
+      "writeHookState"
+    ],
+    "async-writer.mjs": [
+      "maybeDetach",
+      "readHookStdin"
+    ],
+    "capture-utils.mjs": [
+      "isCaptureEnabled",
+      "sanitizeCapturedText",
+      "shouldCaptureText"
+    ],
+    "debug-log.mjs": [
+      "createLogger"
+    ],
+    "mcp-proxy-config.mjs": [
+      "toMcpProxyConfig"
+    ],
+    "mcp-proxy-core.mjs": [
+      "createOpenVikingMcpProxy"
+    ],
+    "uri-guard.mjs": [
+      "evaluateUriGuard",
+      "readToolEvent",
+      "runUriGuardHook"
+    ]
+  }
+}

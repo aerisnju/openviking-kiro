@@ -1,6 +1,6 @@
 {
   "name": "openviking-kiro",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Long-term semantic memory for the Kiro IDE agent — powered by OpenViking. Auto-recall relevant memories and capture the conversation as it happens, as a thin host on OpenViking's agent-hook-plugin framework.",
   "type": "module",
   "engines": {
@@ -11,7 +11,10 @@
     "openviking-kiro-uninstall": "scripts/uninstall.mjs"
   },
   "scripts": {
+    "pretest": "node scripts/check-test-prereqs.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
+    "check-upstream": "node scripts/check-upstream.mjs",
+    "sync-upstream": "node scripts/check-upstream.mjs --sync",
     "install:user": "node scripts/install.mjs",
     "uninstall:user": "node scripts/uninstall.mjs"
   },
