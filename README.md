@@ -95,10 +95,9 @@ the client id (`kiro`).
 - `hosts/kiro-session.mjs` — locates the session's `messages.jsonl`.
 - `hosts/kiro-guard.mjs` — the ask-not-deny PreToolUse envelope helper.
 - `hosts/kiro-capture.mjs` — thin wrapper over the incremental capture model.
-- `hosts/incremental-turn-capture.mjs` — vendored byte-identical from the
-  framework at upstream commit `03391bae` (the cursor/dedup model); see
-  [NOTICE](./NOTICE).
-
+- `scripts/hook.mjs`, `scripts/request-budget.mjs`, `servers/mcp-proxy.mjs` and
+  `hosts/incremental-turn-capture.mjs` — byte-identical copies of the upstream
+  files (see [NOTICE](./NOTICE) and `upstream.lock.json`).
 The memory logic itself is not here: recall, batching, the pending queue,
 credential resolution and the MCP proxy all come from
 `~/.openviking/agent-integrations/memory-plugin-shared/lib`, imported via the
@@ -114,18 +113,130 @@ side.
 
 ## License and attribution
 
-Licensed under the GNU Affero General Public License v3.0 (see
-[LICENSE](./LICENSE)). This project is derived from and built on
+This project is licensed under the GNU Affero General Public License v3.0 (see
+[LICENSE](./LICENSE)). It is built on
 [OpenViking](https://github.com/volcengine/OpenViking)'s `agent-hook-plugin`
-framework (`examples/agent-hook-plugin/`, AGPL-3.0), which is also AGPL-3.0.
-[NOTICE](./NOTICE) lists which files come from upstream. Source for the
-upstream project is at the link above.
+framework. The upstream code it copies comes from OpenViking's `examples/`
+tree, which upstream licenses under Apache-2.0 (the OpenViking repository root
+is AGPL-3.0). [NOTICE](./NOTICE) lists which files come from upstream, under
+which license, and from which upstream commit.
 
 ## Tests
 
-All tests are offline — they parse fixtures, check envelopes, and write only
-into a temp `--prefix` dir. None contact the OpenViking cloud.
+All tests are offline. They use fixtures, temp directories and a stub HTTP
+server on `127.0.0.1`; none contacts an OpenViking server or any other remote
+host, and none writes outside its temp directory.
 
 ```powershell
-node --test tests/
+npm test
 ```
+
+`npm test` first runs `scripts/check-test-prereqs.mjs`, then
+`node --test "tests/**/*.test.mjs"` (the quoted glob is the form that works on
+Node 24).
+
+**One-time prerequisite.** The host modules import the shared runtime with the
+relative path `../../memory-plugin-shared/lib`, which from a checkout is a
+sibling of the repo folder. A fresh clone does not have it, so create it once,
+as a link to the runtime that an official OpenViking memory plugin installs
+(install one first if `~/.openviking/agent-integrations/memory-plugin-shared`
+does not exist):
+
+```powershell
+# Windows (PowerShell)
+New-Item -ItemType Junction -Path "<repo-parent>\memory-plugin-shared" `
+  -Target "$env:USERPROFILE\.openviking\agent-integrations\memory-plugin-shared"
+```
+
+```sh
+# macOS / Linux
+ln -s ~/.openviking/agent-integrations/memory-plugin-shared <repo-parent>/memory-plugin-shared
+```
+
+`<repo-parent>` is the folder that contains this repository's folder. If the
+link is missing, `npm test` stops at the prerequisite check and prints these
+commands with your actual paths. The tests only read through the link. See
+[tests/README.md](./tests/README.md) for what each test file covers.
+
+## Keeping in sync with upstream
+
+Four files here are byte-identical copies of upstream files, six are adapted
+copies and eight follow an upstream pattern; the shared runtime is imported at
+run time. OpenViking changes often, so `upstream.lock.json` records the
+upstream commit and blob each file came from (or was last reviewed against),
+and `scripts/check-upstream.mjs` compares them with a local clone of
+`volcengine/OpenViking`. It has no dependencies and needs only Node 18+ and
+`git`.
+
+1. Update your clone yourself, for example `git -C <clone> pull --ff-only`.
+   The tool never fetches, pulls, checks out or writes anything in the clone.
+2. Check:
+
+   ```sh
+   node scripts/check-upstream.mjs --upstream <clone>
+   # or: npm run check-upstream -- --upstream <clone>   (or set OPENVIKING_UPSTREAM)
+   ```
+
+   Add `--installed <dir>` if your runtime is not under
+   `~/.openviking/agent-integrations`, and `--json` for a machine-readable
+   report.
+3. Read the result:
+   - **Class A** (verbatim copies): `IDENTICAL`, or `DRIFTED` with the upstream
+     commits since the recorded one. Drift makes the exit code 1.
+   - **Class B / C** (adapted or pattern-mirrored files): `UNCHANGED`, or
+     `CHANGED` with the upstream commit subjects. This is a warning (exit 0;
+     `--strict` makes it exit 1). It means a human should look.
+   - **Imports**: the tool parses every import from
+     `../../memory-plugin-shared/lib/*` in this repo and checks that each
+     symbol still exists in the clone's lib and in the installed lib. Anything
+     `MISSING`, `MODULE-MISSING` or `MODULE-ERROR` is `BREAKING` (exit 1).
+   - It also prints the upstream HEAD and plugin version, whether the installed
+     lib differs from the clone's lib (version skew), and whether upstream now
+     mentions Kiro.
+   - Exit codes: 0 clean, 1 drift or breakage, 2 usage or I/O error.
+4. Class A drift: `node scripts/check-upstream.mjs --upstream <clone> --sync`
+   re-copies only the drifted class A files from the clone's working tree
+   (LF line endings, exact bytes) and updates their lock entries. It refuses if
+   the clone's working tree is dirty for those paths unless you pass `--force`.
+   If the new `hook.mjs` imports a sibling file this repo does not have yet, the
+   check reports it; add the file to `upstream.lock.json` as class A and run
+   `--sync` again.
+5. Class B / C changes: read each upstream commit
+   (`git -C <clone> show <sha> -- <upstream path>`), port what matters by hand
+   (the Kiro-specific differences are listed in [NOTICE](./NOTICE)), then record
+   that you reviewed it: `node scripts/check-upstream.mjs --upstream <clone> --update-lock`.
+   That command refuses while a class A file is not identical.
+6. Run `npm test` (it includes a contract test that fails if upstream's
+   dispatcher starts reading an adapter field the Kiro adapter lacks), then
+   `node scripts/install.mjs --dry-run`, then install for real and restart
+   Kiro.
+
+`upstream.lock.json` is also checked by a test: it fails if a locked file
+changed without the lock being updated.
+
+## Known limitations
+
+- **The shared runtime belongs to the official OpenViking installers.** This
+  integration imports `~/.openviking/agent-integrations/memory-plugin-shared`
+  but does not own it. In OpenViking's `examples/memory-plugin-shared/install.sh`
+  (upstream commit `14fa24dc5`), `uninstall_agent_integrations` (lines 2786-2794)
+  runs `rm -rf` on that directory when none of the `cursor`, `trae`, `trae-cn`,
+  `trae-cli`, `zcode`, `kimicode` or `codebuddy` directories remains under
+  `agent-integrations/`; the removal of the legacy TRAE CLI integration (lines
+  2377-2383) does the same with the first five. `kiro` is not in those lists.
+  So uninstalling your last official hook host deletes the runtime this
+  integration imports, and the Kiro hooks then fail until you re-run an official
+  installer to restore it. `node scripts/check-upstream.mjs` reports a missing
+  installed lib.
+- **`plugin.kiro` in `ovcli.conf`** may be reported as an unknown key by the
+  official doctor, because `kiro` is not in upstream's `HARNESS_KEYS`. It has
+  no functional effect on the hooks; per-harness defaults fall back to the
+  global default.
+- **What is captured:** user prompts and the assistant's visible text
+  (`Say` records) only. Tool calls and results, reasoning, and sub-agent
+  records are not captured.
+- **Stop runs inline** under a 25 s request budget (the hook timeout is 30 s).
+  A write that does not finish is queued and replayed at the next session start.
+- **Verified only on the author's Kiro build.** Kiro's hook and session
+  formats may differ in other builds. Release 0.1.0 captured nothing because of
+  a bug fixed in 0.1.1 (see [CHANGELOG.md](./CHANGELOG.md)).

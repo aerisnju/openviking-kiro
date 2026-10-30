@@ -74,9 +74,19 @@ execution purely by **ordering** (the Kimi Code pattern, not ZCode) and does **n
 `_meta.kiro.userMessageTag`, which is present only in newer builds. If a Stop fires before any
 assistant `Say`, the trailing user is **left pending** (no synthetic turn) and captured on the
 next Stop under its real `executionId` — this avoids a double-send that a synthetic,
-per-record id would cause. Capture is **inline** under a `requestBudgets:{stop:25_000}` budget
-that aborts ~5 s before Kiro's 30 s Stop kill, so the cursor state always persists inside the
-timeout; an aborted write is enqueued and replayed on the next SessionStart.
+per-record id would cause. Capture is **inline** under a `requestBudgets` entry of 25 s for
+Stop (17 s for UserPromptSubmit and 25 s for SessionStart, the same values as upstream's ZCode
+adapter), so each hook ends before its Kiro timeout (30 / 20 / 30 s) and the cursor state always
+persists; an aborted write is enqueued and replayed on the next SessionStart.
+
+**Capture contract.** `buildKiroTurns(input, state)` returns an object `{ status, turns }`
+(`status` is `"ok"`, `"missing"` or `"unreadable"`), not an array. `kiro.capture()` unpacks
+`turns` before calling the plan builder (`buildIncrementalCapturePlan` iterates its first
+argument), logs a non-`ok` status to the debug log, and writes nothing when there is nothing
+new. Release 0.1.0 passed the whole object, so every Stop threw `turns is not iterable` inside
+`hook.mjs`, which swallows errors by design; nothing was captured. `tests/kiro-capture.test.mjs`
+and `tests/kiro-capture-e2e.test.mjs` now run the real capture flow, in process and through
+`scripts/hook.mjs`, against a stub server.
 
 ## 4. Session-directory discovery, with `sess_`-prefix tolerance
 
@@ -103,7 +113,14 @@ The Kiro host adds only the Kiro-specific surface: the adapter (`hosts/kiro.mjs`
 capture wrapper (`hosts/kiro-capture.mjs`), host config templates, the installer/uninstaller,
 steering + skill assets, docs, and offline tests. Everything else — `addAgentMessages`,
 `commitAgentSession`, the incremental cursor/dedup model, retry queue, MCP proxy, credentials —
-is imported from the already-installed shared runtime and **not reimplemented**. The one
-byte-identical vendored file is `incremental-turn-capture.mjs` (it lives under the framework's
-`hosts/`, not under `memory-plugin-shared/lib`); if upstream later moves it into the shared lib,
-the Kiro import switches and the vendored copy is dropped.
+is imported from the already-installed shared runtime and **not reimplemented**.
+
+Four files are byte-identical copies of upstream's `examples/agent-hook-plugin/`:
+`scripts/hook.mjs`, `scripts/request-budget.mjs`, `servers/mcp-proxy.mjs` and
+`hosts/incremental-turn-capture.mjs` (the last lives under the framework's `hosts/`, not under
+`memory-plugin-shared/lib`). Six more files are adapted copies and eight follow an upstream
+pattern; `upstream.lock.json` records the upstream commit and blob each was taken from or last
+reviewed against, and `scripts/check-upstream.mjs` reports drift and verifies the symbols imported
+from the shared runtime (see "Keeping in sync with upstream" in the README). If upstream later
+moves `incremental-turn-capture.mjs` into the shared lib, the Kiro import switches and the
+vendored copy is dropped.

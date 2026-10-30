@@ -6,34 +6,83 @@ Version 3 (AGPL-3.0). See the LICENSE file.
 
 Upstream attribution
 --------------------
-openviking-kiro is derived from, and built on, the agent-hook-plugin
-framework of OpenViking:
+openviking-kiro is built on the agent-hook-plugin framework of OpenViking:
 
   Project:  OpenViking
   Source:   https://github.com/volcengine/OpenViking
-  Path:     examples/agent-hook-plugin/
-  License:  GNU Affero General Public License v3.0 (AGPL-3.0)
+  Paths:    examples/agent-hook-plugin/, examples/skills/openviking-memory/
+  Synced:   upstream commit 14fa24dc59228c94461a9d331b0727bc5af97349
+            (2026-10-30), plugin version 0.5.29
 
-What comes from upstream:
+Licenses of the upstream code
+-----------------------------
+The OpenViking repository uses different licenses for different parts (see the
+"License" section of its README). For the paths this project uses:
 
-- scripts/hook.mjs, scripts/uri-guard.mjs and hosts/index.mjs are adapted from
-  the files of the same name in examples/agent-hook-plugin/ (modified to
-  register the Kiro host).
-- servers/mcp-proxy.mjs has the same content as the upstream file of the same
-  name.
-- hosts/kiro.mjs follows the structure of the upstream ZCode host
-  (examples/agent-hook-plugin/hosts/zcode.mjs).
-- hosts/incremental-turn-capture.mjs is a verbatim, unmodified copy of
-  examples/agent-hook-plugin/hosts/incremental-turn-capture.mjs from upstream
-  commit 03391bae4335eacf440a62d942f3951de6a63cbe (2026-09-23). Upstream has
-  changed that file since; this copy has not been updated to follow it.
-- At run time this package imports the OpenViking shared runtime
-  (memory-plugin-shared/lib) from the user's own OpenViking installation under
-  ~/.openviking/agent-integrations/. That runtime is not included in this
-  repository.
+- examples/ (including examples/agent-hook-plugin/, examples/skills/ and
+  examples/memory-plugin-shared/): Apache License 2.0. The file
+  examples/LICENSE in the OpenViking repository is the Apache-2.0 text, and
+  examples/agent-hook-plugin/plugin.json declares "license": "Apache-2.0".
+- The repository root, the OpenViking server and core: GNU Affero General
+  Public License v3.0 (AGPL-3.0), per the root LICENSE file.
 
-The Kiro-specific parts (hosts/kiro*.mjs, the installer and uninstaller, the
-Kiro assets, and the tests) were written for this project.
+Every file this project copies or adapts comes from examples/, so the upstream
+code in this repository is Apache-2.0 code. This project as a whole is
+distributed under AGPL-3.0 (see LICENSE). The upstream files carry no license
+header of their own; none was removed. The Apache-2.0 text is at
+https://www.apache.org/licenses/LICENSE-2.0 and in examples/LICENSE of the
+OpenViking repository.
+
+Provenance of each file is recorded in upstream.lock.json and checked by
+scripts/check-upstream.mjs.
+
+Verbatim copies (byte-identical to upstream; re-synced with
+`node scripts/check-upstream.mjs --upstream <clone> --sync`)
+-----------------------------------------------------------
+Each was copied from upstream commit 14fa24dc59228c94461a9d331b0727bc5af97349
+(2026-10-30):
+
+- scripts/hook.mjs                   <- examples/agent-hook-plugin/scripts/hook.mjs
+- scripts/request-budget.mjs         <- examples/agent-hook-plugin/scripts/request-budget.mjs
+- servers/mcp-proxy.mjs              <- examples/agent-hook-plugin/servers/mcp-proxy.mjs
+- hosts/incremental-turn-capture.mjs <- examples/agent-hook-plugin/hosts/incremental-turn-capture.mjs
+
+Adapted copies (changed by this project; changes listed)
+---------------------------------------------------------
+- scripts/uri-guard.mjs, from examples/agent-hook-plugin/scripts/uri-guard.mjs:
+  reads the client id from argv[3] (the Kiro hook command is
+  `uri-guard.mjs pre-tool-use kiro`) and defaults to "kiro".
+- hosts/index.mjs, from examples/agent-hook-plugin/hosts/index.mjs: registers
+  only the Kiro host.
+- hosts/kiro-capture.mjs, from examples/agent-hook-plugin/hosts/zcode-capture.mjs:
+  the same file with "Zcode" renamed to "Kiro".
+- plugin.json and hosts/kiro/openviking.integration.json, from the upstream files
+  of the same schema: own name, description, author, license, client and version.
+- kiro-assets/skills/openviking-memory/SKILL.md, from
+  examples/skills/openviking-memory/SKILL.md: Kiro wording and tool names.
+
+Files written for this project that follow an upstream pattern
+---------------------------------------------------------------
+- hosts/kiro.mjs follows the structure of the upstream ZCode adapter
+  (hosts/zcode.mjs) and Kimi Code adapter (hosts/kimicode.mjs).
+- hosts/kiro-turns.mjs and hosts/kiro-session.mjs follow the idea of
+  hosts/kimicode-turns.mjs (decode the host's own transcript into turns).
+- hosts/kiro-guard.mjs wraps the shared evaluateUriGuard in an "ask" envelope.
+- hosts/kiro/.mcp.json is a reference template shaped like hosts/zcode/.mcp.json.
+- scripts/install.mjs and scripts/uninstall.mjs mirror the behavior of
+  examples/memory-plugin-shared/install.sh in Node.
+- kiro-assets/steering/openviking-memory.md is original text with the same
+  purpose as hosts/cursor/rules/openviking-memory.mdc.
+
+Run-time dependency
+-------------------
+At run time this package imports the OpenViking shared runtime
+(memory-plugin-shared/lib) from the user's own OpenViking installation under
+~/.openviking/agent-integrations/. That runtime is not included in this
+repository.
+
+The Kiro-specific parts (the installer and uninstaller, the Kiro assets, the
+upstream-sync tooling and the tests) were written for this project.
 
 This is an unofficial community project. It is not affiliated with or
 endorsed by Volcengine or the OpenViking maintainers.
