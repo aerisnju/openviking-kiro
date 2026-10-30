@@ -8,7 +8,7 @@
  * "turns is not iterable" on every Stop and the old suite never called it.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test, { after, beforeEach } from "node:test";
@@ -16,13 +16,18 @@ import test, { after, beforeEach } from "node:test";
 import { kiro } from "../hosts/kiro.mjs";
 import { makeTmp } from "./helpers/tmp.mjs";
 import {
+  STEP_SESSION_JSON,
   append,
   exchange,
+  jsonRpcEvent,
   newSessionId,
   say,
   seedSession,
+  steerEvent,
+  syntheticUser,
   turnStart,
   userOnly,
+  writeSessionJson,
 } from "./helpers/kiro-session-fixture.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -252,4 +257,193 @@ test("regression guard: capture() unpacks buildKiroTurns()'s {status, turns} bef
     /const\s*\{[^}]*\bturns\b[^}]*\}\s*=\s*buildKiroTurns\(/.test(src) ||
     /buildKiroCapturePlan\(\s*\w+\.turns\b/.test(src);
   assert.ok(unpacked, "the turns array must be unpacked from the builder result");
+});
+
+// ── Injected records never reach the POST body ───────────────────────────────
+
+test("capture(): steer events, notifications and synthetic messages never reach the POST body; counts are logged", async () => {
+  append(
+    messagesPath,
+    userOnly("h1", Q1) +
+      turnStart("exec-1") +
+      say("exec-1", A1) +
+      steerEvent("s1", jsonRpcEvent("_kiro/workflow/run_start", { d: "SYNTH-RUNSTART" })) +
+      steerEvent("s2", "SYNTH-STEP-REPORT", { notification: { kind: "system-notification" } }) +
+      steerEvent("s3", "", { steeringClearedIds: ["s1"] }) +
+      syntheticUser("n1", "[WORKFLOW NOTIFICATION] SYNTH-NOTE") +
+      userOnly("h2", Q2) +
+      turnStart("exec-2") +
+      say("exec-2", A2),
+  );
+  const { fetchJSON, calls } = stubFetch();
+  const { ctx, logs } = makeCtx(fetchJSON);
+
+  const next = await kiro.capture(ctx, {}, "stop");
+
+  assert.deepEqual(sentMessages(calls), [
+    { role: "user", content: Q1, turn_id: "exec-1" },
+    { role: "assistant", content: A1, turn_id: "exec-1" },
+    { role: "user", content: Q2, turn_id: "exec-2" },
+    { role: "assistant", content: A2, turn_id: "exec-2" },
+  ]);
+  const body = JSON.stringify(calls.map((c) => c.body));
+  for (const marker of ["SYNTH-", "_kiro/", "WORKFLOW NOTIFICATION"]) assert.equal(body.includes(marker), false, marker);
+  assert.equal(next.lastTurnId, "exec-2");
+
+  const dropLog = logs.find(([event]) => event === "capture_user_records_dropped");
+  assert.ok(dropLog, "drop counts are logged");
+  assert.deepEqual(dropLog[1].dropped, { steer_notification: 2, steer_cleared: 1, synthetic_user_message: 1 });
+  assert.equal(dropLog[1].kept, 2);
+  assert.equal(JSON.stringify(logs).includes("SYNTH-"), false, "logs carry counts and reasons, never content");
+});
+
+test("capture(): an assistant-only turn (user part fully injected) is captured once, alongside a later normal turn", async () => {
+  append(
+    messagesPath,
+    exchange("exec-1", Q1, A1) +
+      syntheticUser("n1", "[WORKFLOW NOTIFICATION] the workflow finished") +
+      turnStart("exec-2") +
+      say("exec-2", A2),
+  );
+  const { fetchJSON, calls } = stubFetch();
+  const { ctx } = makeCtx(fetchJSON);
+
+  const first = await kiro.capture(ctx, {}, "stop");
+  assert.deepEqual(sentMessages(calls).map((m) => `${m.turn_id}:${m.role}`), [
+    "exec-1:user",
+    "exec-1:assistant",
+    "exec-2:assistant",
+  ]);
+  assert.equal(first.lastTurnId, "exec-2");
+
+  calls.length = 0;
+  append(messagesPath, exchange("exec-3", Q3, A3));
+  await kiro.capture(ctx, first, "stop");
+  assert.deepEqual(sentMessages(calls).map((m) => `${m.turn_id}:${m.role}`), ["exec-3:user", "exec-3:assistant"]);
+});
+
+test("capture(): Stop-before-assistant with an injected record ahead of the human prompt: user sent once under the real executionId", async () => {
+  append(messagesPath, steerEvent("s0", jsonRpcEvent("_kiro/workflow/node_start")) + userOnly("h1", Q1));
+  const { fetchJSON, calls } = stubFetch();
+  const { ctx } = makeCtx(fetchJSON);
+  assert.equal(await kiro.capture(ctx, {}, "stop"), null, "only a dangling human user: nothing to send");
+  append(messagesPath, turnStart("exec-5") + say("exec-5", A1));
+  const second = await kiro.capture(ctx, {}, "stop");
+  assert.deepEqual(sentMessages(calls), [
+    { role: "user", content: Q1, turn_id: "exec-5" },
+    { role: "assistant", content: A1, turn_id: "exec-5" },
+  ]);
+  calls.length = 0;
+  assert.equal(await kiro.capture(ctx, second, "stop"), null);
+  assert.equal(calls.length, 0);
+});
+
+// ── Workflow / sub-agent step sessions are not captured ──────────────────────
+
+test("step session: capture() reads, sends and commits NOTHING, and logs the reason once", async () => {
+  writeSessionJson(messagesPath, STEP_SESSION_JSON);
+  // If anything read the transcript it would log capture_unreadable (a directory is not readable as a file).
+  rmSync(messagesPath);
+  mkdirSync(messagesPath);
+  const { fetchJSON, calls } = stubFetch();
+  const { ctx, logs } = makeCtx(fetchJSON);
+
+  const first = await kiro.capture(ctx, {}, "stop");
+  assert.equal(calls.length, 0, "no request of any kind");
+  assert.equal(first.loggedStepSession, true);
+  assert.deepEqual(Object.keys(first).sort(), ["loggedStepSession"], "no capture cursor/state advanced");
+  const skip = logs.filter(([event]) => event === "capture_skipped_step_session");
+  assert.equal(skip.length, 1);
+  assert.deepEqual(skip[0][1], { reason: "root_conversation_id", session_id: `ki-${sessionId}` });
+  assert.equal(logs.some(([event]) => event.startsWith("capture_unreadable")), false, "transcript was never read");
+
+  logs.length = 0;
+  assert.equal(await kiro.capture(ctx, first, "stop"), null, "second Stop: silent no-op");
+  assert.equal(logs.length, 0, "logged only once");
+  assert.equal(calls.length, 0);
+});
+
+test("step session with injected-looking records still sends nothing; a human session beside it still captures", async () => {
+  append(messagesPath, exchange("exec-1", Q1, A1));
+  writeSessionJson(messagesPath, STEP_SESSION_JSON);
+  const stepStub = stubFetch();
+  await kiro.capture(makeCtx(stepStub.fetchJSON).ctx, {}, "stop");
+  assert.equal(stepStub.calls.length, 0);
+
+  // a second, human-facing session in the same Kiro home
+  const humanId = newSessionId();
+  const humanPath = seedSession(kiroHome, humanId, { shortId: "def456" });
+  append(humanPath, exchange("exec-h1", Q2, A2));
+  const humanStub = stubFetch();
+  const { ctx } = makeCtx(humanStub.fetchJSON, {
+    input: { session_id: humanId, hook_event_name: "Stop" },
+    sessionId: `ki-${humanId}`,
+  });
+  const next = await kiro.capture(ctx, {}, "stop");
+  assert.deepEqual(sentMessages(humanStub.calls), [
+    { role: "user", content: Q2, turn_id: "exec-h1" },
+    { role: "assistant", content: A2, turn_id: "exec-h1" },
+  ]);
+  assert.equal(commits(humanStub.calls).length, 1);
+  assert.equal(next.lastTurnId, "exec-h1");
+});
+
+test("session.json missing: this Stop is skipped without advancing the cursor, logged with reason + session id only", async () => {
+  append(messagesPath, exchange("exec-1", Q1, A1));
+  writeSessionJson(messagesPath, null);
+  const { fetchJSON, calls } = stubFetch();
+  const { ctx, logs } = makeCtx(fetchJSON);
+
+  assert.equal(await kiro.capture(ctx, {}, "stop"), null, "no state written, cursor untouched");
+  assert.equal(calls.length, 0);
+  const deferred = logs.filter(([event]) => event === "capture_deferred_session_kind_unknown");
+  assert.equal(deferred.length, 1);
+  assert.deepEqual(deferred[0][1], { reason: "session_json_missing", session_id: `ki-${sessionId}` });
+});
+
+test("session.json unreadable first, readable later: captured then, exactly once", async () => {
+  append(messagesPath, exchange("exec-1", Q1, A1));
+  writeSessionJson(messagesPath, "{ half-written");
+  const { fetchJSON, calls } = stubFetch();
+  const { ctx, logs } = makeCtx(fetchJSON);
+
+  assert.equal(await kiro.capture(ctx, {}, "stop"), null);
+  assert.equal(calls.length, 0);
+  assert.equal(
+    logs.find(([event]) => event === "capture_deferred_session_kind_unknown")[1].reason,
+    "session_json_invalid",
+  );
+
+  // Kiro finishes writing session.json (a human session): the next Stop captures.
+  writeSessionJson(messagesPath, { title: "Synthetic" });
+  const second = await kiro.capture(ctx, {}, "stop");
+  assert.deepEqual(sentMessages(calls), [
+    { role: "user", content: Q1, turn_id: "exec-1" },
+    { role: "assistant", content: A1, turn_id: "exec-1" },
+  ]);
+  assert.equal(second.lastTurnId, "exec-1");
+
+  // and not again
+  calls.length = 0;
+  assert.equal(await kiro.capture(ctx, second, "stop"), null);
+  assert.equal(calls.length, 0);
+});
+
+test("session.json unreadable, then it turns out to be a step session: still nothing is ever sent", async () => {
+  append(messagesPath, exchange("exec-1", Q1, A1));
+  writeSessionJson(messagesPath, "");
+  const { fetchJSON, calls } = stubFetch();
+  const { ctx } = makeCtx(fetchJSON);
+  assert.equal(await kiro.capture(ctx, {}, "stop"), null);
+  writeSessionJson(messagesPath, STEP_SESSION_JSON);
+  await kiro.capture(ctx, {}, "stop");
+  assert.equal(calls.length, 0);
+});
+
+test("an older human session.json without any step marker is captured", async () => {
+  append(messagesPath, exchange("exec-1", Q1, A1));
+  writeSessionJson(messagesPath, { sessionId, title: "old build", workflowsEnabled: true, memoryConfig: { mode: "read_write" } });
+  const { fetchJSON, calls } = stubFetch();
+  await kiro.capture(makeCtx(fetchJSON).ctx, {}, "stop");
+  assert.equal(sentMessages(calls).length, 2);
 });

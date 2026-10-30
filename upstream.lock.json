@@ -126,7 +126,7 @@
       "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
       "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
       "upstreamBlob": "9121711feb77416c17369330363f8a879859f05c",
-      "localSha256": "be54bd3a01ae35b234c988d82790856590ed21bcdb34b9feb4e238e0dec59c01",
+      "localSha256": "429d82fe4cee7545ec3aa765f714ec098b5d5e637c544f36550dad641595e7e6",
       "alsoWatch": [
         {
           "upstreamPath": "examples/agent-hook-plugin/hosts/kimicode.mjs",

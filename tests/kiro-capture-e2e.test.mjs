@@ -29,10 +29,18 @@ import test, { after, before } from "node:test";
 import { fixInstructions, findSharedLib } from "../scripts/check-test-prereqs.mjs";
 import { makeTmp } from "./helpers/tmp.mjs";
 import {
+  STEP_SESSION_JSON,
   append,
   exchange,
+  jsonRpcEvent,
   newSessionId,
+  say,
   seedSession,
+  steerEvent,
+  syntheticUser,
+  turnStart,
+  userOnly,
+  writeSessionJson,
 } from "./helpers/kiro-session-fixture.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -112,7 +120,7 @@ function runHook(stdinObject) {
   });
 }
 
-const stopInput = () => ({ session_id: sessionId, hook_event_name: "Stop", cwd: join(root, "workspace") });
+const stopInput = (sid = sessionId) => ({ session_id: sid, hook_event_name: "Stop", cwd: join(root, "workspace") });
 const batchRequests = () => requests.filter((r) => /\/messages\/batch$/.test(r.url));
 const commitRequests = () => requests.filter((r) => /\/commit$/.test(r.url));
 const logLines = () =>
@@ -231,6 +239,95 @@ test("a new turn is sent alone on the next Stop", async () => {
   ]);
   assert.equal(commitRequests().length, 2);
   assert.deepEqual(logLines().filter((l) => l.stage === "uncaught"), []);
+});
+
+test("a session with harness-injected records: only the human text is POSTed, drop counts are logged", async () => {
+  const sid = newSessionId();
+  const path = seedSession(kiroHome, sid, { shortId: "orch01" });
+  append(
+    path,
+    userOnly("h1", Q1) +
+      turnStart("exec-1") +
+      say("exec-1", A1) +
+      steerEvent("s1", jsonRpcEvent("_kiro/workflow/run_start", { d: "SYNTH-RUNSTART" })) +
+      steerEvent("s2", "SYNTH-STEP-REPORT", { notification: { kind: "system-notification" } }) +
+      syntheticUser("n1", "[WORKFLOW NOTIFICATION] SYNTH-NOTE") +
+      turnStart("exec-2") +
+      say("exec-2", A2),
+  );
+  const before = requests.length;
+
+  const run = await runHook(stopInput(sid));
+
+  assert.equal(run.status, 0, run.stderr);
+  const mine = requests.slice(before);
+  const batches = mine.filter((r) => /\/messages\/batch$/.test(r.url));
+  assert.equal(batches.length, 1);
+  assert.deepEqual(batches[0].body.messages, [
+    { role: "user", content: Q1, turn_id: "exec-1" },
+    { role: "assistant", content: A1, turn_id: "exec-1" },
+    { role: "assistant", content: A2, turn_id: "exec-2" }, // assistant-only turn is kept on purpose
+  ]);
+  assert.equal(JSON.stringify(mine.map((r) => r.body)).includes("SYNTH-"), false);
+  assert.equal(JSON.stringify(mine.map((r) => r.body)).includes("_kiro/"), false);
+
+  const dropLine = logLines().find((l) => l.stage === "capture_user_records_dropped" && l.data?.session_id === `ki-${sid}`);
+  assert.ok(dropLine, "debug log has the drop counts");
+  assert.equal(dropLine.data.kept, 1);
+  assert.deepEqual(dropLine.data.dropped, { steer_notification: 2, synthetic_user_message: 1 });
+  assert.equal(readFileSync(logFile, "utf8").includes("SYNTH-"), false, "log never has dropped content");
+  assert.deepEqual(logLines().filter((l) => l.stage === "uncaught"), []);
+});
+
+test("a workflow step session: the Stop hook makes no request at all, logs the skip once; a human session still captures", async () => {
+  const stepId = newSessionId();
+  const stepPath = seedSession(kiroHome, stepId, { shortId: "step01", sessionJson: STEP_SESSION_JSON });
+  append(stepPath, exchange("exec-s1", Q1, A1));
+  const before = requests.length;
+
+  const run1 = await runHook(stopInput(stepId));
+  const run2 = await runHook(stopInput(stepId));
+  assert.equal(run1.status, 0, run1.stderr);
+  assert.equal(run2.status, 0, run2.stderr);
+  assert.equal(requests.length, before, "no request for a step session");
+
+  const skips = logLines().filter((l) => l.stage === "capture_skipped_step_session" && l.data?.session_id === `ki-${stepId}`);
+  assert.equal(skips.length, 1, "skip logged once across two Stops");
+  assert.equal(skips[0].data.reason, "root_conversation_id");
+
+  // the human session next to it still captures
+  const humanId = newSessionId();
+  const humanPath = seedSession(kiroHome, humanId, { shortId: "human01" });
+  append(humanPath, exchange("exec-h1", Q2, A2));
+  const run3 = await runHook(stopInput(humanId));
+  assert.equal(run3.status, 0, run3.stderr);
+  const posted = requests.slice(before).filter((r) => /\/messages\/batch$/.test(r.url));
+  assert.equal(posted.length, 1);
+  assert.match(posted[0].url, new RegExp(`/sessions/ki-${humanId}/messages/batch$`));
+  assert.deepEqual(logLines().filter((l) => l.stage === "uncaught"), []);
+});
+
+test("unreadable session.json: nothing is sent, the cursor is not advanced, and a later Stop captures once", async () => {
+  const sid = newSessionId();
+  const path = seedSession(kiroHome, sid, { shortId: "late01", sessionJson: "{ broken" });
+  append(path, exchange("exec-l1", Q1, A1));
+  const before = requests.length;
+
+  const run1 = await runHook(stopInput(sid));
+  assert.equal(run1.status, 0, run1.stderr);
+  assert.equal(requests.length, before);
+  assert.equal(existsSync(join(stateDir, "kiro", `${sid}.json`)), false, "no hook state written");
+  const deferred = logLines().find((l) => l.stage === "capture_deferred_session_kind_unknown" && l.data?.session_id === `ki-${sid}`);
+  assert.equal(deferred?.data?.reason, "session_json_invalid");
+
+  writeSessionJson(path, { title: "Synthetic" });
+  const run2 = await runHook(stopInput(sid));
+  assert.equal(run2.status, 0, run2.stderr);
+  const run3 = await runHook(stopInput(sid));
+  assert.equal(run3.status, 0, run3.stderr);
+  const posted = requests.slice(before).filter((r) => /\/messages\/batch$/.test(r.url));
+  assert.equal(posted.length, 1, "captured exactly once");
+  assert.deepEqual(posted[0].body.messages.map((m) => m.role), ["user", "assistant"]);
 });
 
 test("every request went to the loopback stub (nothing else was contacted)", () => {

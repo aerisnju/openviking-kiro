@@ -16,7 +16,9 @@ import {
   commitAgentSession,
 } from "../../memory-plugin-shared/lib/agent-hook-runtime.mjs";
 import { kiroPreToolUseOutput } from "./kiro-guard.mjs";
-import { buildKiroTurns, cleanKiroText } from "./kiro-turns.mjs";
+import { cleanKiroText, extractUnseenKiroTurns } from "./kiro-turns.mjs";
+import { resolveKiroMessagesPath } from "./kiro-session.mjs";
+import { classifyKiroSession } from "./kiro-session-kind.mjs";
 import { applyKiroCaptureResult, buildKiroCapturePlan } from "./kiro-capture.mjs";
 
 /**
@@ -87,11 +89,43 @@ export const kiro = {
     // Thread the visible logger + once-per-session flag into the locator so a
     // present-but-unmatched session is diagnosed loudly, exactly once.
     const parseState = { ...state, __log: ctx.log };
-    // buildKiroTurns() returns { status, turns } (same shape as Kimi's builder),
-    // NOT an array: the plan builder iterates its first argument, so the turns
-    // array must be unpacked here. (0.1.0 passed the whole object and threw
-    // "turns is not iterable" on every Stop.)
-    const transcript = buildKiroTurns(ctx.input, parseState); // reads messages.jsonl
+    const messagesPath = resolveKiroMessagesPath(ctx.input, undefined, {
+      log: ctx.log,
+      state: parseState,
+    });
+
+    // Capture only human-facing sessions. A workflow/sub-agent step session is
+    // skipped BEFORE its transcript is read (nothing is read, sent or committed).
+    // "unknown" (session.json missing/unreadable) also skips this Stop, but
+    // without touching state, so the cursor stays put and the next Stop retries.
+    // See hosts/kiro-session-kind.mjs for the asymmetry rationale.
+    if (messagesPath) {
+      const kind = classifyKiroSession(messagesPath);
+      if (kind.kind === "step") {
+        if (state.loggedStepSession) return null;
+        ctx.log("capture_skipped_step_session", { reason: kind.reason, session_id: ctx.sessionId });
+        return { ...state, loggedStepSession: true };
+      }
+      if (kind.kind === "unknown") {
+        ctx.log("capture_deferred_session_kind_unknown", { reason: kind.reason, session_id: ctx.sessionId });
+        return null;
+      }
+    }
+
+    // extractUnseenKiroTurns() returns { status, turns, userRecords } (same
+    // shape as Kimi's builder), NOT an array: the plan builder iterates its
+    // first argument, so the turns array must be unpacked here. (0.1.0 passed
+    // the whole object and threw "turns is not iterable" on every Stop.)
+    const transcript = extractUnseenKiroTurns(messagesPath, state.lastTurnId || null); // reads messages.jsonl
+    const droppedUserRecords = transcript.userRecords?.dropped || {};
+    if (Object.keys(droppedUserRecords).length > 0) {
+      // Counts and reasons only, never the dropped content.
+      ctx.log("capture_user_records_dropped", {
+        session_id: ctx.sessionId,
+        kept: transcript.userRecords.kept,
+        dropped: droppedUserRecords,
+      });
+    }
     if (transcript.status !== "ok") {
       // "missing" (unresolved session / no transcript yet) or "unreadable":
       // nothing to capture. Say so in the debug log, as Kimi does.
