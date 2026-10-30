@@ -6,7 +6,8 @@
  * only three types are meaningful and every other type is ignored:
  *   - turn_start                       → orders a turn (its executionId)
  *   - assistant with operationType Say → contributes assistant text
- *   - user                             → contributes user text
+ *   - user                             → contributes user text, unless
+ *     classifyKiroUserRecord() marks it harness-injected (kiro-user-records.mjs)
  * Several non-conversation types (turn_end, sub_agent_*, tool_*) also carry an
  * executionId, so a deny-list would let them create/reorder turns. Only
  * turn_start may create/order a turn id.
@@ -22,6 +23,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { sanitizeCapturedText } from "../../memory-plugin-shared/lib/capture-utils.mjs";
 import { resolveKiroMessagesPath } from "./kiro-session.mjs";
+import { classifyKiroUserRecord, textFromContent } from "./kiro-user-records.mjs";
+
+export { classifyKiroUserRecord } from "./kiro-user-records.mjs";
 
 export function cleanKiroText(value) {
   if (value == null) return "";
@@ -36,19 +40,6 @@ export function cleanKiroText(value) {
   return sanitizeCapturedText(text);
 }
 
-function textFromContent(content) {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) {
-    if (content && typeof content === "object" && typeof content.text === "string") {
-      return content.text;
-    }
-    return "";
-  }
-  return content
-    .map((part) => (typeof part === "string" ? part : part?.text || ""))
-    .filter(Boolean)
-    .join("\n");
-}
 
 export function extractUnseenKiroTurns(messagesPath, lastTurnId = null) {
   if (!messagesPath || !existsSync(messagesPath)) return { status: "missing", turns: [] };
@@ -65,6 +56,8 @@ export function extractUnseenKiroTurns(messagesPath, lastTurnId = null) {
   const order = [];
   let pendingUser = "";
   let pendingTag = null;
+  let userKept = 0;
+  const dropped = {};
 
   const remember = (value) => {
     const turnId = String(value);
@@ -98,6 +91,15 @@ export function extractUnseenKiroTurns(messagesPath, lastTurnId = null) {
 
     // ── Allow-list, everything else ignored ──────────────────────────────
     if (payload.type === "user") {
+      // Harness-injected user records (steer events, synthetic notifications)
+      // are dropped HERE, before they can become `pendingUser`; otherwise they
+      // would be glued onto the next real human turn.
+      const verdict = classifyKiroUserRecord(payload);
+      if (!verdict.keep) {
+        dropped[verdict.reason] = (dropped[verdict.reason] || 0) + 1;
+        continue;
+      }
+      userKept += 1;
       const text = textFromContent(payload.content);
       if (text) pendingUser = pendingUser ? `${pendingUser}\n${text}` : text;
       const tag = payload?._meta?.kiro?.userMessageTag;
@@ -132,9 +134,16 @@ export function extractUnseenKiroTurns(messagesPath, lastTurnId = null) {
       if (userTags.has(turnId)) turn.userMessageTag = userTags.get(turnId);
       turns.push(turn);
     }
+    // Assistant-only turns are emitted ON PURPOSE. When the user part of a turn
+    // was entirely harness-injected (e.g. a workflow result) and dropped above,
+    // the agent's Say text is still its reply to the human and is captured.
+    // Dedup keys are per role (`<turnId>:assistant`), so nothing is sent twice.
     if (assistant) turns.push({ role: "assistant", content: assistant, turnId });
   }
-  return { status: "ok", turns };
+  // `userRecords` carries counts only (kept, and dropped per reason) for the
+  // debug log; never the content of a dropped record. Counts cover the whole
+  // file, not just the unseen slice.
+  return { status: "ok", turns, userRecords: { kept: userKept, dropped } };
 }
 
 export function buildKiroTurns(input = {}, state = {}) {

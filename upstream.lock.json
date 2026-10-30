@@ -143,7 +143,7 @@
       "upstreamCommit": "14fa24dc59228c94461a9d331b0727bc5af97349",
       "upstreamCommitDate": "2026-10-30T03:55:31-07:00",
       "upstreamBlob": "dc43d6f5350d1c457b820b746b47a33827bfe299",
-      "localSha256": "6b09f102dec690d67477b9584b259f771170af7ca8dc19b10f5e4803acc4714f",
+      "localSha256": "2462847fae1a1657049fb2b10fa7e9c5665fe7b12551106586a8bde8e1f7d7f2",
       "alsoWatch": [
         {
           "upstreamPath": "examples/agent-hook-plugin/hosts/zcode-turns.mjs",
